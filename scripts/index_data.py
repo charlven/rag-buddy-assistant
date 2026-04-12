@@ -24,6 +24,8 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         help="Optional file extensions (e.g. .md .py .txt). Defaults to built-in list.",
     )
+    parser.add_argument("--project-id", default=None, help="Optional project/repository ID (recommended for code).")
+    parser.add_argument("--project-name", default=None, help="Optional project display name.")
     parser.add_argument("--chunk-size", type=int, default=None)
     parser.add_argument("--chunk-overlap", type=int, default=None)
     return parser.parse_args()
@@ -37,6 +39,8 @@ def main() -> None:
     chunks, files = ingest_path(
         data_path=args.data_path,
         namespace=args.namespace,
+        project_id=args.project_id,
+        project_name=args.project_name,
         recursive=not args.no_recursive,
         file_extensions=args.extensions,
         chunk_size=args.chunk_size,

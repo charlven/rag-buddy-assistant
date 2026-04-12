@@ -1,0 +1,44 @@
+[
+  {
+    "project_id": "activiti",
+    "project_name": "spring-boot-with-activiti-example",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\gitRepository\\spring-boot-with-activiti-example",
+    "indexed_at": "2026-04-12T10:57:07.536649+00:00"
+  },
+  {
+    "project_id": "debug-project",
+    "project_name": "Debug Project",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\My Inovation\\langchain-lab",
+    "indexed_at": "2026-04-12T11:01:09.308712+00:00"
+  },
+  {
+    "project_id": "activiti-repro",
+    "project_name": "activiti repro",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\gitRepository\\spring-boot-with-activiti-example",
+    "indexed_at": "2026-04-12T11:34:39.257577+00:00"
+  },
+  {
+    "project_id": "exclude-test",
+    "project_name": "Exclude Test",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\My Inovation\\langchain-lab\\data\\tmp-exclude-test",
+    "indexed_at": "2026-04-12T12:13:13.707740+00:00"
+  },
+  {
+    "project_id": "batch-test-130",
+    "project_name": "Batch Test 130",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\My Inovation\\langchain-lab\\data\\tmp-batch-test",
+    "indexed_at": "2026-04-12T12:15:26.236480+00:00"
+  },
+  {
+    "project_id": "microservice-scaffold",
+    "project_name": "microservice-scaffold",
+    "namespace": "code",
+    "root_path": "D:\\Working folder\\gitRepository\\microservice-scaffold",
+    "indexed_at": "2026-04-12T12:18:49.687582+00:00"
+  }
+]

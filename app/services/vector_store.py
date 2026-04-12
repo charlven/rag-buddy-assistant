@@ -15,7 +15,13 @@ def _collection_name(namespace: str) -> str:
 @lru_cache(maxsize=1)
 def get_embeddings() -> OpenAIEmbeddings:
     settings = get_settings()
-    return OpenAIEmbeddings(model=settings.embedding_model, api_key=settings.openai_api_key)
+    base_url = settings.openai_base_url or None
+    return OpenAIEmbeddings(
+        model=settings.embedding_model,
+        api_key=settings.openai_api_key,
+        base_url=base_url,
+        chunk_size=settings.embedding_batch_size,
+    )
 
 
 def get_vector_store(namespace: str) -> Chroma:

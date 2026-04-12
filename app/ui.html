@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Code Project RAG UI</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; max-width: 980px; }
+      h1, h2 { margin-bottom: 8px; }
+      .card { border: 1px solid #ccc; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+      label { display: block; margin: 6px 0 2px; }
+      input, textarea, select, button { width: 100%; padding: 8px; box-sizing: border-box; }
+      button { cursor: pointer; margin-top: 8px; }
+      #answer { white-space: pre-wrap; line-height: 1.4; }
+      .muted { color: #666; font-size: 12px; }
+      ul { margin: 8px 0 0 20px; }
+    </style>
+  </head>
+  <body>
+    <h1>Code Project RAG</h1>
+    <p class="muted">Import repositories into Chroma and ask implementation/request-flow questions.</p>
+
+    <div class="card">
+      <h2>Import Project</h2>
+      <label for="projectId">Project ID (short unique key)</label>
+      <input id="projectId" placeholder="billing-service" />
+
+      <label for="projectName">Project Name</label>
+      <input id="projectName" placeholder="Billing Service" />
+
+      <label for="projectPath">Repository Path on Server</label>
+      <input id="projectPath" placeholder="D:\repo\billing-service" />
+
+      <button id="importBtn">Import Project</button>
+      <div id="importResult" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h2>Projects</h2>
+      <button id="refreshProjectsBtn">Refresh List</button>
+      <ul id="projectList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Ask</h2>
+      <label for="projectFilter">Project Filter (optional)</label>
+      <select id="projectFilter">
+        <option value="">All indexed projects</option>
+      </select>
+
+      <label for="question">Question</label>
+      <textarea id="question" rows="5" placeholder="Which repository implements order cancellation and what is the request flow?"></textarea>
+
+      <button id="askBtn">Ask AI</button>
+      <h3>Answer</h3>
+      <div id="answer"></div>
+      <h3>Citations</h3>
+      <ul id="citations"></ul>
+    </div>
+
+    <script>
+      async function refreshProjects() {
+        const response = await fetch("/projects");
+        const projects = await response.json();
+
+        const listEl = document.getElementById("projectList");
+        listEl.innerHTML = "";
+        for (const p of projects) {
+          const li = document.createElement("li");
+          li.textContent = `${p.project_id} (${p.project_name}) -> ${p.root_path}`;
+          listEl.appendChild(li);
+        }
+
+        const selectEl = document.getElementById("projectFilter");
+        selectEl.innerHTML = '<option value="">All indexed projects</option>';
+        for (const p of projects) {
+          const opt = document.createElement("option");
+          opt.value = p.project_id;
+          opt.textContent = `${p.project_id} - ${p.project_name}`;
+          selectEl.appendChild(opt);
+        }
+      }
+
+      document.getElementById("refreshProjectsBtn").addEventListener("click", refreshProjects);
+
+      document.getElementById("importBtn").addEventListener("click", async () => {
+        const project_id = document.getElementById("projectId").value.trim();
+        const project_name = document.getElementById("projectName").value.trim();
+        const data_path = document.getElementById("projectPath").value.trim();
+
+        const resultEl = document.getElementById("importResult");
+        resultEl.textContent = "Importing...";
+
+        const response = await fetch("/projects/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id,
+            project_name: project_name || null,
+            data_path,
+            recursive: true
+          })
+        });
+
+        if (!response.ok) {
+          let detail = "";
+          try {
+            const err = await response.json();
+            detail = err?.detail ? ` - ${err.detail}` : "";
+          } catch {
+            const text = await response.text();
+            detail = text ? ` - ${text}` : "";
+          }
+          resultEl.textContent = `Import failed: ${response.status}${detail}`;
+          return;
+        }
+
+        const data = await response.json();
+        resultEl.textContent = `Imported ${data.indexed_files} files and ${data.indexed_chunks} chunks for ${data.project_id}.`;
+        await refreshProjects();
+      });
+
+      document.getElementById("askBtn").addEventListener("click", async () => {
+        const question = document.getElementById("question").value.trim();
+        const projectFilter = document.getElementById("projectFilter").value;
+
+        const answerEl = document.getElementById("answer");
+        const citationsEl = document.getElementById("citations");
+        answerEl.textContent = "Thinking...";
+        citationsEl.innerHTML = "";
+
+        const payload = {
+          question,
+          namespaces: ["code"],
+          project_ids: projectFilter ? [projectFilter] : [],
+          chat_history: []
+        };
+
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          answerEl.textContent = `Chat failed: ${response.status}`;
+          return;
+        }
+
+        const data = await response.json();
+        answerEl.textContent = data.answer;
+        for (const c of data.citations) {
+          const li = document.createElement("li");
+          const project = c.project_id ? `${c.project_id}: ` : "";
+          const rel = c.relative_path ? ` (${c.relative_path})` : "";
+          li.textContent = `${project}${c.source}${rel}`;
+          citationsEl.appendChild(li);
+        }
+      });
+
+      refreshProjects();
+    </script>
+  </body>
+</html>

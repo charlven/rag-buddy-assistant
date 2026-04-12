@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from app.models import (
     ChatRequest,
@@ -13,8 +15,11 @@ from app.models import (
     OpenAIChatCompletionRequest,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
+    ProjectImportRequest,
+    ProjectInfo,
 )
 from app.services.ingestion import ingest_path
+from app.services.project_registry import list_projects, upsert_project
 from app.services.retrieval import ask_rag
 from app.services.vector_store import reset_namespace
 
@@ -42,6 +47,8 @@ def ingest(request: IngestRequest) -> IngestResponse:
         chunks, files = ingest_path(
             data_path=request.data_path,
             namespace=request.namespace,
+            project_id=request.project_id,
+            project_name=request.project_name,
             recursive=request.recursive,
             file_extensions=request.file_extensions,
             chunk_size=request.chunk_size,
@@ -49,7 +56,46 @@ def ingest(request: IngestRequest) -> IngestResponse:
         )
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
-    return IngestResponse(namespace=request.namespace, indexed_chunks=chunks, indexed_files=files)
+    return IngestResponse(
+        namespace=request.namespace,
+        project_id=request.project_id,
+        indexed_chunks=chunks,
+        indexed_files=files,
+    )
+
+
+@app.post("/projects/import", response_model=IngestResponse)
+def import_project(request: ProjectImportRequest) -> IngestResponse:
+    if request.reset_namespace:
+        reset_namespace("code")
+
+    project_name = request.project_name or request.project_id
+    try:
+        chunks, files = ingest_path(
+            data_path=request.data_path,
+            namespace="code",
+            project_id=request.project_id,
+            project_name=project_name,
+            recursive=request.recursive,
+            file_extensions=request.file_extensions,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+
+    upsert_project(project_id=request.project_id, project_name=project_name, root_path=request.data_path)
+    return IngestResponse(
+        namespace="code",
+        project_id=request.project_id,
+        indexed_chunks=chunks,
+        indexed_files=files,
+    )
+
+
+@app.get("/projects", response_model=list[ProjectInfo])
+def projects() -> list[ProjectInfo]:
+    return list_projects()
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -58,6 +104,7 @@ def chat(request: ChatRequest) -> ChatResponse:
     answer, citations = ask_rag(
         question=request.question,
         namespaces=request.namespaces,
+        project_ids=request.project_ids,
         chat_history=history,
     )
     return ChatResponse(answer=answer, citations=citations)
@@ -80,6 +127,7 @@ def openai_chat(request: OpenAIChatCompletionRequest) -> OpenAIChatCompletionRes
     answer, _ = ask_rag(
         question=question,
         namespaces=request.namespaces,
+        project_ids=request.project_ids,
         chat_history=history,
     )
 
@@ -95,4 +143,10 @@ def openai_chat(request: OpenAIChatCompletionRequest) -> OpenAIChatCompletionRes
             )
         ],
     )
+
+
+@app.get("/ui", response_class=HTMLResponse)
+def ui() -> str:
+    ui_path = Path(__file__).resolve().parent / "ui.html"
+    return ui_path.read_text(encoding="utf-8")
 

@@ -9,10 +9,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     openai_api_key: str = Field(default="")
+    openai_base_url: str = Field(default="")
     chat_model: str = Field(default="gpt-4.1-mini")
     embedding_model: str = Field(default="text-embedding-3-large")
+    embedding_batch_size: int = Field(default=64, ge=1, le=512)
 
     chroma_persist_directory: Path = Field(default=Path("./data/chroma"))
+    project_registry_path: Path = Field(default=Path("./data/projects.json"))
     collection_prefix: str = Field(default="rag")
 
     chunk_size: int = Field(default=1000, ge=200, le=4000)
