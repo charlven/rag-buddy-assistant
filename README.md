@@ -1,6 +1,6 @@
-# LangChain RAG Backend (for Open WebUI frontend)
+# RAG Buddy Assistant
 
-This starter gives you a custom RAG backend for:
+RAG Buddy Assistant is a custom RAG backend for:
 - Personal data indexing (`personal` namespace)
 - Source code indexing (`code` namespace)
 - Project-aware source code indexing (project/repository metadata)
@@ -60,6 +60,10 @@ Built-in local UI:
 ```powershell
 Start-Process "http://localhost:8000/ui"
 ```
+
+The built-in UI now talks to the OpenAI-compatible backend endpoints:
+- `GET /v1/models`
+- `POST /v1/chat/completions`
 
 ## 3) Ingest your data
 
@@ -132,17 +136,22 @@ In Open WebUI:
    - `http://host.docker.internal:8000/v1` (if Open WebUI runs in Docker and backend runs on host)
    - `http://localhost:8000/v1` (if both run on same host network)
 3. API key can be any placeholder unless your Open WebUI requires a non-empty token.
-4. Use non-streaming mode (`stream=false`) in this starter backend.
+4. This backend supports both `stream=true` and `stream=false`.
 
 ### OpenAI-compatible request supported
 
 - `POST /v1/chat/completions`
 - Expects `messages`
 - Accepts optional `namespaces` field: `["personal"]`, `["code"]`, or both
+- Supports optional `project_ids` for repository filtering
+
+### OpenAI-compatible models supported
+
+- `GET /v1/models` returns the configured backend chat model from `.env` (`CHAT_MODEL`)
 
 ## Notes
 
 - Vector store is local Chroma at `./data/chroma`.
 - Project registry is stored at `./data/projects.json`.
-- This starter uses OpenAI-compatible APIs for both embeddings and chat model, so you can point it to OpenAI or GLM via `OPENAI_BASE_URL`.
+- This project uses OpenAI-compatible APIs for both embeddings and chat model, so you can point it to OpenAI or GLM via `OPENAI_BASE_URL`.
 - Add auth, audit logging, and PII controls before production use.

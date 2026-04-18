@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Code Project RAG UI</title>
+    <title>RAG Buddy Assistant UI</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; max-width: 980px; }
       h1, h2 { margin-bottom: 8px; }
@@ -14,11 +14,12 @@
       #answer { white-space: pre-wrap; line-height: 1.4; }
       .muted { color: #666; font-size: 12px; }
       ul { margin: 8px 0 0 20px; }
+      #chatHistory { max-height: 300px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4; }
     </style>
   </head>
   <body>
-    <h1>Code Project RAG</h1>
-    <p class="muted">Import repositories into Chroma and ask implementation/request-flow questions.</p>
+    <h1>RAG Buddy Assistant</h1>
+    <p class="muted">Import repositories into Chroma, then chat via <code>/v1/chat/completions</code>.</p>
 
     <div class="card">
       <h2>Import Project</h2>
@@ -43,6 +44,9 @@
 
     <div class="card">
       <h2>Ask</h2>
+      <label for="model">Model</label>
+      <input id="model" placeholder="gpt-4.1-mini" />
+
       <label for="projectFilter">Project Filter (optional)</label>
       <select id="projectFilter">
         <option value="">All indexed projects</option>
@@ -52,6 +56,9 @@
       <textarea id="question" rows="5" placeholder="Which repository implements order cancellation and what is the request flow?"></textarea>
 
       <button id="askBtn">Ask AI</button>
+      <button id="clearChatBtn">Clear Chat History</button>
+      <h3>Chat History</h3>
+      <div id="chatHistory" class="muted"></div>
       <h3>Answer</h3>
       <div id="answer"></div>
       <h3>Citations</h3>
@@ -59,6 +66,33 @@
     </div>
 
     <script>
+      const chatHistory = [];
+
+      function renderChatHistory() {
+        const chatEl = document.getElementById("chatHistory");
+        if (!chatHistory.length) {
+          chatEl.textContent = "No messages yet.";
+          return;
+        }
+        chatEl.textContent = chatHistory
+          .map((msg) => `${msg.role}: ${msg.content}`)
+          .join("\n\n");
+      }
+
+      async function loadDefaultModel() {
+        try {
+          const response = await fetch("/v1/models");
+          if (!response.ok) return;
+          const data = await response.json();
+          const modelEl = document.getElementById("model");
+          if (!modelEl.value.trim() && data?.data?.length) {
+            modelEl.value = data.data[0].id;
+          }
+        } catch {
+          // Keep UI usable even if models endpoint is unavailable.
+        }
+      }
+
       async function refreshProjects() {
         const response = await fetch("/projects");
         const projects = await response.json();
@@ -122,33 +156,55 @@
 
       document.getElementById("askBtn").addEventListener("click", async () => {
         const question = document.getElementById("question").value.trim();
+        const model = document.getElementById("model").value.trim() || "rag-backend";
         const projectFilter = document.getElementById("projectFilter").value;
 
         const answerEl = document.getElementById("answer");
         const citationsEl = document.getElementById("citations");
         answerEl.textContent = "Thinking...";
         citationsEl.innerHTML = "";
+        if (!question) {
+          answerEl.textContent = "Please enter a question.";
+          return;
+        }
 
+        const messages = [...chatHistory, { role: "user", content: question }];
         const payload = {
-          question,
+          model,
+          stream: false,
+          messages,
           namespaces: ["code"],
-          project_ids: projectFilter ? [projectFilter] : [],
-          chat_history: []
+          project_ids: projectFilter ? [projectFilter] : []
         };
 
-        const response = await fetch("/chat", {
+        const response = await fetch("/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
         if (!response.ok) {
-          answerEl.textContent = `Chat failed: ${response.status}`;
+          let detail = "";
+          try {
+            const err = await response.json();
+            detail = err?.detail ? ` - ${err.detail}` : "";
+          } catch {
+            const text = await response.text();
+            detail = text ? ` - ${text}` : "";
+          }
+          answerEl.textContent = `Chat failed: ${response.status}${detail}`;
           return;
         }
 
         const data = await response.json();
-        answerEl.textContent = data.answer;
-        for (const c of data.citations) {
+        const assistantContent = data?.choices?.[0]?.message?.content || "";
+        answerEl.textContent = assistantContent || "(empty response)";
+
+        chatHistory.push({ role: "user", content: question });
+        chatHistory.push({ role: "assistant", content: assistantContent });
+        renderChatHistory();
+        document.getElementById("question").value = "";
+
+        for (const c of data.citations || []) {
           const li = document.createElement("li");
           const project = c.project_id ? `${c.project_id}: ` : "";
           const rel = c.relative_path ? ` (${c.relative_path})` : "";
@@ -157,6 +213,15 @@
         }
       });
 
+      document.getElementById("clearChatBtn").addEventListener("click", () => {
+        chatHistory.length = 0;
+        renderChatHistory();
+        document.getElementById("answer").textContent = "";
+        document.getElementById("citations").innerHTML = "";
+      });
+
+      renderChatHistory();
+      loadDefaultModel();
       refreshProjects();
     </script>
   </body>

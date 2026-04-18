@@ -5,6 +5,26 @@ from app.models import Citation
 from app.services.vector_store import get_vector_store
 
 
+def _is_small_talk(question: str) -> bool:
+    normalized = " ".join(question.lower().strip().split())
+    if not normalized:
+        return False
+    trivial_messages = {
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "thanks",
+        "thank you",
+    }
+    if normalized in trivial_messages:
+        return True
+    return normalized.startswith(("hi ", "hello ", "hey ", "thanks ", "thank you "))
+
+
 def _format_history(history: list[tuple[str, str]]) -> str:
     if not history:
         return "No prior chat history."
@@ -17,6 +37,12 @@ def ask_rag(
     project_ids: list[str] | None = None,
     chat_history: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Citation]]:
+    if _is_small_talk(question):
+        return (
+            "Hi! I am ready. Ask me about your indexed projects, code flow, or implementation details.",
+            [],
+        )
+
     settings = get_settings()
     base_url = settings.openai_base_url or None
     llm = ChatOpenAI(
@@ -74,9 +100,10 @@ def ask_rag(
 
     history = _format_history(chat_history or [])
     prompt = f"""
-You are an assistant that answers only from retrieved context.
+You are a retrieval-grounded assistant.
 Use concise, direct answers. If context is insufficient, say so clearly.
 Always include citation references like [1], [2] that map to provided chunks.
+If the user message is casual small talk (for example greeting/thanks), respond naturally without citations.
 When user asks implementation ownership, mention the most likely project/repository and key files.
 When user asks request/logic flow, summarize sequence in ordered steps using file/function references.
 

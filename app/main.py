@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
+import json
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from app.models import (
     ChatRequest,
@@ -15,15 +16,18 @@ from app.models import (
     OpenAIChatCompletionRequest,
     OpenAIChatCompletionResponse,
     OpenAIChatMessage,
+    OpenAIModelInfo,
+    OpenAIModelListResponse,
     ProjectImportRequest,
     ProjectInfo,
 )
+from app.config import get_settings
 from app.services.ingestion import ingest_path
 from app.services.project_registry import list_projects, upsert_project
 from app.services.retrieval import ask_rag
 from app.services.vector_store import reset_namespace
 
-app = FastAPI(title="LangChain RAG Backend", version="0.1.0")
+app = FastAPI(title="RAG Buddy Assistant", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -110,21 +114,15 @@ def chat(request: ChatRequest) -> ChatResponse:
     return ChatResponse(answer=answer, citations=citations)
 
 
-@app.post("/v1/chat/completions", response_model=OpenAIChatCompletionResponse)
-def openai_chat(request: OpenAIChatCompletionRequest) -> OpenAIChatCompletionResponse:
-    if request.stream:
-        raise HTTPException(
-            status_code=400,
-            detail="Streaming is not implemented in this starter. Use stream=false.",
-        )
-
+@app.post("/v1/chat/completions", response_model=None)
+def openai_chat(request: OpenAIChatCompletionRequest):
     user_messages = [m.content for m in request.messages if m.role == "user"]
     if not user_messages:
         raise HTTPException(status_code=400, detail="messages must include at least one user message")
 
     question = user_messages[-1]
     history = [(m.role, m.content) for m in request.messages[:-1]]
-    answer, _ = ask_rag(
+    answer, citations = ask_rag(
         question=question,
         namespaces=request.namespaces,
         project_ids=request.project_ids,
@@ -132,9 +130,44 @@ def openai_chat(request: OpenAIChatCompletionRequest) -> OpenAIChatCompletionRes
     )
 
     model_name = request.model or "rag-backend"
+    completion_id = f"chatcmpl-{uuid4().hex}"
+    created = int(datetime.now(UTC).timestamp())
+
+    if request.stream:
+        def event_stream() -> str:
+            role_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model_name,
+                "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+            }
+            yield f"data: {json.dumps(role_chunk)}\n\n"
+
+            content_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model_name,
+                "choices": [{"index": 0, "delta": {"content": answer}, "finish_reason": None}],
+            }
+            yield f"data: {json.dumps(content_chunk)}\n\n"
+
+            stop_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model_name,
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            }
+            yield f"data: {json.dumps(stop_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
     return OpenAIChatCompletionResponse(
-        id=f"chatcmpl-{uuid4().hex}",
-        created=int(datetime.now(UTC).timestamp()),
+        id=completion_id,
+        created=created,
         model=model_name,
         choices=[
             OpenAIChatCompletionChoice(
@@ -142,7 +175,14 @@ def openai_chat(request: OpenAIChatCompletionRequest) -> OpenAIChatCompletionRes
                 message=OpenAIChatMessage(role="assistant", content=answer),
             )
         ],
+        citations=citations,
     )
+
+
+@app.get("/v1/models", response_model=OpenAIModelListResponse)
+def openai_models() -> OpenAIModelListResponse:
+    settings = get_settings()
+    return OpenAIModelListResponse(data=[OpenAIModelInfo(id=settings.chat_model)])
 
 
 @app.get("/ui", response_class=HTMLResponse)

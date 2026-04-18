@@ -95,3 +95,15 @@ class OpenAIChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: list[OpenAIChatCompletionChoice]
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class OpenAIModelInfo(BaseModel):
+    id: str
+    object: str = "model"
+    owned_by: str = "rag-backend"
+
+
+class OpenAIModelListResponse(BaseModel):
+    object: str = "list"
+    data: list[OpenAIModelInfo]
