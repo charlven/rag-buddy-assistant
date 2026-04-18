@@ -1,14 +1,27 @@
 # RAG Buddy Assistant
 
-RAG Buddy Assistant is a custom RAG backend for:
-- Personal data indexing (`personal` namespace)
-- Source code indexing (`code` namespace)
-- Project-aware source code indexing (project/repository metadata)
-- Chat answering with retrieval context and citations
+RAG Buddy Assistant is an open-source, OpenAI-compatible RAG backend for **code intelligence** and **personal knowledge assistance**.  
+It works with Open WebUI and any client that supports the OpenAI Chat Completions API.
 
-You can use Open WebUI as frontend and point it to this backend via OpenAI-compatible API endpoint.
+## What it does
 
-## 1) Setup
+- Indexes personal documents (`personal` namespace)
+- Indexes source code (`code` namespace)
+- Supports project-aware retrieval (`project_id`, `project_name`)
+- Answers with grounded context and citations
+- Supports OpenAI-compatible `stream=true` and `stream=false`
+
+## Architecture
+
+- **API server**: FastAPI (`app/main.py`)
+- **Embeddings + chat model**: OpenAI-compatible provider (`langchain-openai`)
+- **Vector DB**: Chroma (`./data/chroma`)
+- **Project registry**: JSON store (`./data/projects.json`)
+- **Frontend (optional)**: Open WebUI
+
+## Quick start
+
+### 1) Install
 
 ```powershell
 python -m venv .venv
@@ -17,9 +30,11 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Recommended Python: **3.11 or 3.12** for the broadest package compatibility.
+Recommended Python: **3.11 or 3.12**.
 
-Edit `.env` and set your model provider values:
+### 2) Configure model provider
+
+Update `.env`:
 
 ```env
 OPENAI_API_KEY=your_api_key
@@ -29,24 +44,12 @@ EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_BATCH_SIZE=64
 ```
 
-For OpenAI, keep `OPENAI_BASE_URL` empty.
+For GLM (or other OpenAI-compatible providers), set `OPENAI_BASE_URL` accordingly.
 
-For GLM (OpenAI-compatible), set:
-
-```env
-OPENAI_API_KEY=your_glm_key
-OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-CHAT_MODEL=glm-4.5
-EMBEDDING_MODEL=embedding-3
-EMBEDDING_BATCH_SIZE=64
-```
-
-## 2) Start API
+### 3) Run the API
 
 ```powershell
-uvicorn app.main:app --reload --port 8000
-or
-python -m uvicorn app.main:app --port 8000 *> .\server.log
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Health check:
@@ -55,46 +58,54 @@ Health check:
 Invoke-RestMethod http://localhost:8000/health
 ```
 
-Built-in local UI:
+## Index data
 
-```powershell
-Start-Process "http://localhost:8000/ui"
-```
-
-The built-in UI now talks to the OpenAI-compatible backend endpoints:
-- `GET /v1/models`
-- `POST /v1/chat/completions`
-
-## 3) Ingest your data
-
-### Index personal docs
+### Personal documents
 
 ```powershell
 python .\scripts\index_data.py --data-path "D:\my_personal_docs" --namespace personal --reset-namespace
 ```
 
-### Index source code
+### Source code
 
 ```powershell
 python .\scripts\index_data.py --data-path "D:\my_source_code" --namespace code --reset-namespace
 ```
 
-### Index source code with project/repository identity (recommended)
+### Source code with project identity (recommended)
 
 ```powershell
 python .\scripts\index_data.py --data-path "D:\repos\order-service" --namespace code --project-id order-service --project-name "Order Service"
 python .\scripts\index_data.py --data-path "D:\repos\billing-service" --namespace code --project-id billing-service --project-name "Billing Service"
 ```
 
-Optional: choose file types
+Optional file filters:
 
 ```powershell
 python .\scripts\index_data.py --data-path "D:\my_source_code" --namespace code --extensions .py .ts .md
 ```
 
-Default indexing behavior skips common generated/dependency folders such as `.git`, `node_modules`, `target`, `dist`, `build`, `.venv`, and `__pycache__`.
+Default ingestion skips common generated/dependency folders such as `.git`, `node_modules`, `target`, `dist`, `build`, `.venv`, and `__pycache__`.
 
-## 4) Chat directly with backend
+## API overview
+
+### Core endpoints
+
+- `GET /health`
+- `POST /ingest`
+- `POST /projects/import`
+- `GET /projects`
+- `POST /chat` (native request/response format)
+
+### OpenAI-compatible endpoints
+
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+  - Expects `messages`
+  - Supports `stream=true` and `stream=false`
+  - Accepts optional `namespaces` and `project_ids`
+
+### Example: native chat endpoint
 
 ```powershell
 $body = @{
@@ -107,51 +118,34 @@ $body = @{
 Invoke-RestMethod -Method Post -Uri "http://localhost:8000/chat" -ContentType "application/json" -Body $body
 ```
 
-## 5) Project import APIs (for custom UI/Open WebUI tooling)
+## Open WebUI integration
 
-Import a code repository:
+Use Open WebUI as the frontend and configure it as an OpenAI provider.
 
-```powershell
-$body = @{
-  data_path = "D:\repos\order-service"
-  project_id = "order-service"
-  project_name = "Order Service"
-  recursive = $true
-} | ConvertTo-Json
+- If Open WebUI runs in Docker and backend runs on host:
+  - `http://host.docker.internal:8000/v1`
+- If both run on the same host network:
+  - `http://localhost:8000/v1`
 
-Invoke-RestMethod -Method Post -Uri "http://localhost:8000/projects/import" -ContentType "application/json" -Body $body
-```
+Detailed setup and maintenance commands are in:
 
-List imported projects:
+- [`OPEN_WEBUI_INTEGRATION_GUIDE.md`](./OPEN_WEBUI_INTEGRATION_GUIDE.md)
 
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8000/projects"
-```
+## Built-in local UI
 
-## 6) Connect Open WebUI
+For quick local testing:
 
-In Open WebUI:
-1. Add an **OpenAI-compatible connection**.
-2. Set base URL to your backend:
-   - `http://host.docker.internal:8000/v1` (if Open WebUI runs in Docker and backend runs on host)
-   - `http://localhost:8000/v1` (if both run on same host network)
-3. API key can be any placeholder unless your Open WebUI requires a non-empty token.
-4. This backend supports both `stream=true` and `stream=false`.
+- `http://localhost:8000/ui`
 
-### OpenAI-compatible request supported
+## Production notes
 
-- `POST /v1/chat/completions`
-- Expects `messages`
-- Accepts optional `namespaces` field: `["personal"]`, `["code"]`, or both
-- Supports optional `project_ids` for repository filtering
+- Add authentication and authorization
+- Add audit logging and PII controls
+- Restrict CORS and secure secrets management
+- Add monitoring and rate limiting
 
-### OpenAI-compatible models supported
+## Community
 
-- `GET /v1/models` returns the configured backend chat model from `.env` (`CHAT_MODEL`)
-
-## Notes
-
-- Vector store is local Chroma at `./data/chroma`.
-- Project registry is stored at `./data/projects.json`.
-- This project uses OpenAI-compatible APIs for both embeddings and chat model, so you can point it to OpenAI or GLM via `OPENAI_BASE_URL`.
-- Add auth, audit logging, and PII controls before production use.
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
