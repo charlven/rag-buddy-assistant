@@ -142,7 +142,7 @@ The built-in UI includes a modernized project/chat workspace and talks directly 
 - `GET /v1/models`
 - `POST /v1/chat/completions`
 
-## Git automation helper (feat/fix pattern)
+## Git automation helper (commit, tag, release)
 
 This project includes a local automation script:
 
@@ -153,11 +153,27 @@ It enforces commit title format:
 - `[feat]your description`
 - `[fix]your description`
 
-Example:
+Commit and push example:
 
 ```powershell
 python .\scripts\git_commit_push_agent.py --type feat --description "improve dashboard layout" --all
 ```
+
+Commit + push + tag + GitHub release example:
+
+```powershell
+python .\scripts\git_commit_push_agent.py --type feat --description "ui enhancement and copilot agents" --all --tag v0.2.0 --release --release-title "v0.2.0 - UI enhancement and agent skills" --release-notes "Enhanced local UI and added Copilot custom agent/skills for commit/push and testing."
+```
+
+Release-related flags:
+
+- `--tag <tag-name>`: create and push an annotated git tag
+- `--tag-message "<message>"`: custom annotated tag message
+- `--release`: create a GitHub release for the tag (requires `gh` CLI)
+- `--release-title "<title>"`: custom release title
+- `--release-notes "<notes>"`: custom release notes
+- `--draft`: publish as draft release
+- `--prerelease`: mark as prerelease
 
 ## Production notes
 
