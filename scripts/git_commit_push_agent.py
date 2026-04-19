@@ -2,9 +2,6 @@ import argparse
 import subprocess
 import sys
 
-COAUTHOR_TRAILER = "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-
-
 def run_git(args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
@@ -200,7 +197,7 @@ def main() -> None:
             print(f"Would create GitHub release for tag: {args.tag}")
         return
 
-    commit_result = run_git(["commit", "-m", commit_title, "-m", COAUTHOR_TRAILER])
+    commit_result = run_git(["commit", "-m", commit_title])
     if commit_result.returncode != 0:
         print(commit_result.stderr.strip() or commit_result.stdout.strip() or "git commit failed.", file=sys.stderr)
         raise SystemExit(1)

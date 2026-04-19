@@ -20,5 +20,6 @@ Execution rules:
 2. Never use any other commit title format.
 3. Ensure there are staged changes before committing.
 4. Push only to the requested branch (or current branch if none is specified).
-5. If tag/release is requested, use script flags (`--tag`, `--release`) instead of manual ad-hoc commands.
-6. If commit, push, tag, or release fails, return the exact error and stop.
+5. Commit using the repository user's configured git identity only (no automatic Copilot co-author trailer).
+6. If tag/release is requested, use script flags (`--tag`, `--release`) instead of manual ad-hoc commands.
+7. If commit, push, tag, or release fails, return the exact error and stop.

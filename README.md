@@ -159,6 +159,8 @@ Commit and push example:
 python .\scripts\git_commit_push_agent.py --type feat --description "improve dashboard layout" --all
 ```
 
+Commits are created using your current git identity (`user.name` / `user.email`) without adding an automatic Copilot co-author trailer.
+
 Commit + push + tag + GitHub release example:
 
 ```powershell

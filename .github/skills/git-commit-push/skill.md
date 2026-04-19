@@ -47,3 +47,4 @@ No extra prefixes. No alternate styles.
 - The script enforces the final title as `[type]description`.
 - `--all` stages current changes before commit.
 - `--release` requires `gh` CLI authentication and `--tag`.
+- Commits use your local git identity (`user.name` / `user.email`) without adding a Copilot co-author trailer.
