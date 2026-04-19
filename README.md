@@ -137,6 +137,28 @@ For quick local testing:
 
 - `http://localhost:8000/ui`
 
+The built-in UI includes a modernized project/chat workspace and talks directly to:
+
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+
+## Git automation helper (feat/fix pattern)
+
+This project includes a local automation script:
+
+- `scripts/git_commit_push_agent.py`
+
+It enforces commit title format:
+
+- `[feat]your description`
+- `[fix]your description`
+
+Example:
+
+```powershell
+python .\scripts\git_commit_push_agent.py --type feat --description "improve dashboard layout" --all
+```
+
 ## Production notes
 
 - Add authentication and authorization

@@ -5,68 +5,318 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RAG Buddy Assistant UI</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 20px; max-width: 980px; }
-      h1, h2 { margin-bottom: 8px; }
-      .card { border: 1px solid #ccc; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
-      label { display: block; margin: 6px 0 2px; }
-      input, textarea, select, button { width: 100%; padding: 8px; box-sizing: border-box; }
-      button { cursor: pointer; margin-top: 8px; }
-      #answer { white-space: pre-wrap; line-height: 1.4; }
-      .muted { color: #666; font-size: 12px; }
-      ul { margin: 8px 0 0 20px; }
-      #chatHistory { max-height: 300px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4; }
+      :root {
+        --bg: #0b1020;
+        --bg-accent: #121a33;
+        --card: rgba(19, 31, 58, 0.78);
+        --card-border: rgba(139, 166, 255, 0.26);
+        --text: #e9efff;
+        --muted: #a9b7de;
+        --primary: #6ea8ff;
+        --primary-strong: #4f8ef8;
+        --success: #4ade80;
+        --danger: #ff7b8a;
+        --shadow: 0 14px 40px rgba(3, 8, 23, 0.45);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 8% 10%, #20366f 0%, transparent 40%),
+          radial-gradient(circle at 88% 90%, #1f2d53 0%, transparent 40%),
+          linear-gradient(145deg, var(--bg) 0%, #080d1d 65%, #060a17 100%);
+      }
+
+      .container {
+        width: min(1200px, 94vw);
+        margin: 24px auto 42px;
+      }
+
+      .hero {
+        background: linear-gradient(120deg, rgba(110, 168, 255, 0.2), rgba(126, 87, 255, 0.18));
+        border: 1px solid rgba(152, 178, 255, 0.3);
+        border-radius: 20px;
+        padding: 26px 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3.4vw, 2.4rem);
+        letter-spacing: 0.3px;
+      }
+
+      .hero p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+      }
+
+      .badge-row {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(146, 173, 255, 0.35);
+        background: rgba(72, 102, 188, 0.2);
+        color: #dce8ff;
+        font-size: 0.8rem;
+      }
+
+      .grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        grid-column: span 12;
+        border: 1px solid var(--card-border);
+        border-radius: 16px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+        padding: 16px 18px;
+        backdrop-filter: blur(8px);
+      }
+
+      @media (min-width: 980px) {
+        .card-left { grid-column: span 5; }
+        .card-right { grid-column: span 7; }
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1.12rem;
+      }
+
+      .section-subtitle {
+        margin: -5px 0 12px;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .span-2 { grid-column: span 2; }
+
+      label {
+        display: block;
+        margin: 0 0 6px;
+        color: #d7e4ff;
+        font-size: 0.85rem;
+      }
+
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid rgba(142, 170, 255, 0.33);
+        background: rgba(8, 16, 35, 0.62);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 0.94rem;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      input:focus, textarea:focus, select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.2);
+      }
+
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+        line-height: 1.45;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 11px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: #03102f;
+        background: linear-gradient(180deg, #8abbff 0%, var(--primary) 100%);
+        box-shadow: 0 8px 18px rgba(89, 149, 255, 0.33);
+        transition: transform 0.16s ease, filter 0.16s ease;
+      }
+
+      button:hover { transform: translateY(-1px); filter: brightness(1.03); }
+      button:active { transform: translateY(0); }
+      button.secondary {
+        color: var(--text);
+        background: rgba(78, 102, 174, 0.34);
+        border: 1px solid rgba(145, 170, 255, 0.32);
+        box-shadow: none;
+      }
+
+      .status {
+        margin-top: 10px;
+        min-height: 20px;
+        font-size: 0.88rem;
+      }
+
+      .status.ok { color: var(--success); }
+      .status.error { color: var(--danger); }
+
+      .panel {
+        border: 1px solid rgba(145, 170, 255, 0.26);
+        border-radius: 12px;
+        background: rgba(7, 15, 33, 0.62);
+        padding: 10px 12px;
+      }
+
+      .panel-title {
+        margin: 0 0 8px;
+        font-size: 0.86rem;
+        color: #cddcff;
+        letter-spacing: 0.2px;
+      }
+
+      #projectList, #citations {
+        margin: 0;
+        padding-left: 18px;
+        max-height: 185px;
+        overflow: auto;
+        color: #dce8ff;
+        line-height: 1.4;
+      }
+
+      #answer, #chatHistory {
+        white-space: pre-wrap;
+        line-height: 1.45;
+        color: #eaf1ff;
+        min-height: 70px;
+        max-height: 240px;
+        overflow: auto;
+      }
+
+      #chatHistory { max-height: 190px; color: #c9d9ff; }
+
+      code {
+        background: rgba(83, 116, 193, 0.2);
+        padding: 2px 6px;
+        border-radius: 7px;
+      }
     </style>
   </head>
   <body>
-    <h1>RAG Buddy Assistant</h1>
-    <p class="muted">Import repositories into Chroma, then chat via <code>/v1/chat/completions</code>.</p>
+    <main class="container">
+      <section class="hero">
+        <h1>RAG Buddy Assistant</h1>
+        <p>Modern local workspace for project ingestion, retrieval-grounded chat, and OpenAI-compatible requests via <code>/v1/chat/completions</code>.</p>
+        <div class="badge-row">
+          <span class="badge">OpenAI Compatible</span>
+          <span class="badge">Project-aware Retrieval</span>
+          <span class="badge">Citation Ready</span>
+        </div>
+      </section>
 
-    <div class="card">
-      <h2>Import Project</h2>
-      <label for="projectId">Project ID (short unique key)</label>
-      <input id="projectId" placeholder="billing-service" />
+      <section class="grid">
+        <article class="card card-left">
+          <h2>Project Ingestion</h2>
+          <p class="section-subtitle">Import repositories into Chroma and refresh project metadata.</p>
+          <div class="form-grid">
+            <div>
+              <label for="projectId">Project ID</label>
+              <input id="projectId" placeholder="billing-service" />
+            </div>
+            <div>
+              <label for="projectName">Project Name</label>
+              <input id="projectName" placeholder="Billing Service" />
+            </div>
+            <div class="span-2">
+              <label for="projectPath">Repository Path on Server</label>
+              <input id="projectPath" placeholder="D:\repo\billing-service" />
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="importBtn">Import Project</button>
+            <button id="refreshProjectsBtn" class="secondary">Refresh Projects</button>
+          </div>
+          <div id="importResult" class="status"></div>
+          <div class="panel">
+            <h3 class="panel-title">Indexed Projects</h3>
+            <ul id="projectList"></ul>
+          </div>
+        </article>
 
-      <label for="projectName">Project Name</label>
-      <input id="projectName" placeholder="Billing Service" />
-
-      <label for="projectPath">Repository Path on Server</label>
-      <input id="projectPath" placeholder="D:\repo\billing-service" />
-
-      <button id="importBtn">Import Project</button>
-      <div id="importResult" class="muted"></div>
-    </div>
-
-    <div class="card">
-      <h2>Projects</h2>
-      <button id="refreshProjectsBtn">Refresh List</button>
-      <ul id="projectList"></ul>
-    </div>
-
-    <div class="card">
-      <h2>Ask</h2>
-      <label for="model">Model</label>
-      <input id="model" placeholder="gpt-4.1-mini" />
-
-      <label for="projectFilter">Project Filter (optional)</label>
-      <select id="projectFilter">
-        <option value="">All indexed projects</option>
-      </select>
-
-      <label for="question">Question</label>
-      <textarea id="question" rows="5" placeholder="Which repository implements order cancellation and what is the request flow?"></textarea>
-
-      <button id="askBtn">Ask AI</button>
-      <button id="clearChatBtn">Clear Chat History</button>
-      <h3>Chat History</h3>
-      <div id="chatHistory" class="muted"></div>
-      <h3>Answer</h3>
-      <div id="answer"></div>
-      <h3>Citations</h3>
-      <ul id="citations"></ul>
-    </div>
+        <article class="card card-right">
+          <h2>Chat Workspace</h2>
+          <p class="section-subtitle">Conversation state is maintained in this page session.</p>
+          <div class="form-grid">
+            <div>
+              <label for="model">Model</label>
+              <input id="model" placeholder="gpt-4.1-mini" />
+            </div>
+            <div>
+              <label for="projectFilter">Project Filter</label>
+              <select id="projectFilter">
+                <option value="">All indexed projects</option>
+              </select>
+            </div>
+            <div class="span-2">
+              <label for="question">Question</label>
+              <textarea id="question" placeholder="Which repository implements order cancellation and what is the request flow?"></textarea>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="askBtn">Ask AI</button>
+            <button id="clearChatBtn" class="secondary">Clear Chat</button>
+          </div>
+          <div class="grid" style="margin-top: 12px;">
+            <div class="panel" style="grid-column: span 12;">
+              <h3 class="panel-title">Answer</h3>
+              <div id="answer"></div>
+            </div>
+            <div class="panel" style="grid-column: span 6;">
+              <h3 class="panel-title">Chat History</h3>
+              <div id="chatHistory"></div>
+            </div>
+            <div class="panel" style="grid-column: span 6;">
+              <h3 class="panel-title">Citations</h3>
+              <ul id="citations"></ul>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
 
     <script>
       const chatHistory = [];
+
+      function setStatus(message, kind = "ok") {
+        const el = document.getElementById("importResult");
+        el.textContent = message;
+        el.className = `status ${kind}`;
+      }
 
       function renderChatHistory() {
         const chatEl = document.getElementById("chatHistory");
@@ -74,9 +324,7 @@
           chatEl.textContent = "No messages yet.";
           return;
         }
-        chatEl.textContent = chatHistory
-          .map((msg) => `${msg.role}: ${msg.content}`)
-          .join("\n\n");
+        chatEl.textContent = chatHistory.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n");
       }
 
       async function loadDefaultModel() {
@@ -89,7 +337,7 @@
             modelEl.value = data.data[0].id;
           }
         } catch {
-          // Keep UI usable even if models endpoint is unavailable.
+          // Keep UI usable if models endpoint is unavailable.
         }
       }
 
@@ -115,15 +363,22 @@
         }
       }
 
-      document.getElementById("refreshProjectsBtn").addEventListener("click", refreshProjects);
+      document.getElementById("refreshProjectsBtn").addEventListener("click", async () => {
+        await refreshProjects();
+        setStatus("Project list refreshed.");
+      });
 
       document.getElementById("importBtn").addEventListener("click", async () => {
         const project_id = document.getElementById("projectId").value.trim();
         const project_name = document.getElementById("projectName").value.trim();
         const data_path = document.getElementById("projectPath").value.trim();
 
-        const resultEl = document.getElementById("importResult");
-        resultEl.textContent = "Importing...";
+        if (!project_id || !data_path) {
+          setStatus("Project ID and repository path are required.", "error");
+          return;
+        }
+
+        setStatus("Importing project...");
 
         const response = await fetch("/projects/import", {
           method: "POST",
@@ -145,12 +400,12 @@
             const text = await response.text();
             detail = text ? ` - ${text}` : "";
           }
-          resultEl.textContent = `Import failed: ${response.status}${detail}`;
+          setStatus(`Import failed: ${response.status}${detail}`, "error");
           return;
         }
 
         const data = await response.json();
-        resultEl.textContent = `Imported ${data.indexed_files} files and ${data.indexed_chunks} chunks for ${data.project_id}.`;
+        setStatus(`Imported ${data.indexed_files} files and ${data.indexed_chunks} chunks for ${data.project_id}.`, "ok");
         await refreshProjects();
       });
 
@@ -163,6 +418,7 @@
         const citationsEl = document.getElementById("citations");
         answerEl.textContent = "Thinking...";
         citationsEl.innerHTML = "";
+
         if (!question) {
           answerEl.textContent = "Please enter a question.";
           return;
@@ -182,6 +438,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
+
         if (!response.ok) {
           let detail = "";
           try {
